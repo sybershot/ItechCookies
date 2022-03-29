@@ -6,14 +6,10 @@ from robot.api.logger import info, debug
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException
 
-from configuration.constants import COOKIES_PATH
 from itechframework.configuration.constants import TIMEOUT
 from itechframework.modules.robot_browser.browser_element import BrowserElement
-
-
-class ElementNotFound(Exception):
-    pass
 
 
 class Browser:
@@ -35,9 +31,9 @@ class Browser:
         self.driver.get(url)
 
     @keyword(name='Wait until visible')
-    def wait_until_visible(self, by, locator):
+    def wait_until_visible(self, by, locator, timeout=TIMEOUT):
         info(f'Waiting until {by!r} {locator!r} is visible')
-        return WebDriverWait(self.driver, TIMEOUT).until(EC.visibility_of_element_located((by, locator)))
+        return WebDriverWait(self.driver, timeout).until(EC.visibility_of_element_located((by, locator)))
 
     @keyword(name='Capture page screenshot')
     def capture_page_screenshot(self, file_name):
@@ -49,12 +45,19 @@ class Browser:
         info(f'Searching all elements by {by!r} {locator!r}')
         return [BrowserElement(e, by, locator) for e in self.driver.find_elements(by, locator)]
 
-    def find_element_or_raise(self, by, locator) -> BrowserElement:
+    def find_element_or_raise(self, by, locator, timeout=TIMEOUT) -> BrowserElement:
         debug(f'Searching element {by!r} {locator!r}')
-        if element := WebDriverWait(self.driver, TIMEOUT).until(EC.presence_of_element_located((by, locator))):
+        if element := WebDriverWait(self.driver, timeout).until(EC.presence_of_element_located((by, locator))):
             return BrowserElement(element, by, locator)
         else:
-            raise ElementNotFound(f'Failed to find element {by!r} {locator!r}!')
+            raise NoSuchElementException(f'Failed to find element {by!r} {locator!r}!')
+
+    def is_exist(self, by, locator):
+        try:
+            self.driver.find_element(by, locator)
+        except NoSuchElementException:
+            return False
+        return True
 
     def save_cookies(self, file_path):
         cookies = self.driver.get_cookies()

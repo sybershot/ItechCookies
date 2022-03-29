@@ -1,7 +1,27 @@
-from robot.api.logger import info, debug
+from robot.api.logger import info, debug, warn
+from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver import ActionChains
+
 from itechframework.configuration.constants import BROWSER_TYPE
 from itechframework.modules.waitutils import waituntiltrue
+
+
+def updateifstale(func, max_attempts=5):
+    def wrapper(self, *args, **kwargs):
+        attempt = 1
+        while True:
+            try:
+                func(self, *args, **kwargs)
+            except StaleElementReferenceException:
+                warn(f'Tried to interact with stale element {self.by!r} {self.locator!r}! Updating...')
+                if attempt >= max_attempts:
+                    raise Exception(f'Maximum number of tries reached for {self.by!r} {self.locator!r}!')
+                self.update_element()
+                attempt += 1
+                continue
+            return func
+
+    return wrapper
 
 
 class BrowserElement:
@@ -27,13 +47,15 @@ class BrowserElement:
         browser = BrowserManager().get_browser(BROWSER_TYPE)
         return [BrowserElement(e.element, by, locator) for e in browser.find_elements(by, locator)]
 
+    @updateifstale
     def input_text(self, text):
         info(f'Sending {text!r} to {self.by!r} {self.locator!r}')
         self.element.send_keys(text)
 
-    def click_element(self):
+    @updateifstale
+    def click_element(self, max_attempts=5):
         debug(f'Clicking {self.by!r} {self.locator!r}')
-        if self.is_clickable():
+        if self.wait_clickable():
             self.log_screenshot()
             self.element.click()
         else:
@@ -48,6 +70,9 @@ class BrowserElement:
         info(f'<img src="data:image/png;base64, {self.element.screenshot_as_base64}">', html=True)
 
     @waituntiltrue
-    def is_clickable(self):
+    def wait_clickable(self):
         if self.element.is_displayed() and self.element.is_enabled():
             return True
+
+    def update_element(self):
+        self.element = BrowserElement.from_locator(self.by, self.locator).element

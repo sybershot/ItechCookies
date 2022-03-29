@@ -1,6 +1,5 @@
 import os
 import pathlib
-import pickle
 from logging import info
 
 from robot.api.deco import keyword
@@ -25,6 +24,7 @@ class CookieSteps:
     def login_to_wiki(page: WikiMainPage, login, password):
         try:
             page.get_login_fields()
+            page.browser.driver.refresh()
             page.login_input.input_text(login)
             page.password_input.input_text(password)
             page.remember_me.click_element()
@@ -49,4 +49,4 @@ class CookieSteps:
     @staticmethod
     @keyword(name="Check If Logged In")
     def check_if_logged_in(browser):
-        browser.find_element_or_raise('xpath', '//*[@id="login-container"]/*//a[contains(@href, "dashboard.action")]')
+        browser.find_element_or_raise('xpath', '//p/a')
